@@ -1,13 +1,36 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>frontend</title>
-  </head>
-  <body>
-    <div id="app"></div>
-    <script type="module" src="/src/main.js"></script>
-  </body>
+
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PuppyFit</title>
+  <!-- SPA redirect handler for GitHub Pages -->
+  <script>
+    (function () {
+      var redirect = sessionStorage.redirect;
+      delete sessionStorage.redirect;
+      if (redirect && redirect !== location.href) {
+        history.replaceState(null, null, redirect);
+      }
+      // Handle 404 redirect with query param
+      var search = location.search;
+      if (search && search.indexOf('?p=') === 0) {
+        var path = search.slice(3).split('&')[0];
+        var hash = location.hash;
+        var query = search.indexOf('&q=') !== -1 ? '?' + search.split('&q=')[1] : '';
+        history.replaceState(null, null,
+          location.pathname.slice(0, -1) + path + query + hash
+        );
+      }
+    })();
+  </script>
+</head>
+
+<body>
+  <div id="app"></div>
+  <script type="module" src="/src/main.js"></script>
+</body>
+
 </html>
