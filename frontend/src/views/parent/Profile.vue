@@ -29,9 +29,8 @@
             </div>
             
             <div class="form-group">
-              <label>班级</label>
-              <input v-if="isEditing" v-model="editForm.classNum" type="text" />
-              <div v-else class="static-val">{{ userInfo.classNum || '未设置' }}</div>
+              <label>班级 <span class="readonly-hint" v-if="isEditing">（管理员设置）</span></label>
+              <div class="static-val">{{ userInfo.classNum || '未设置' }}</div>
             </div>
 
             <div class="form-group">
@@ -44,6 +43,18 @@
               <input v-if="isEditing" v-model="editForm.parentName" type="text" />
               <div v-else class="static-val">{{ userInfo.parentName || '未设置' }}</div>
             </div>
+
+            <div class="form-group">
+              <label>手机号</label>
+              <input v-if="isEditing" v-model="editForm.phone" type="tel" placeholder="请输入手机号" />
+              <div v-else class="static-val">{{ userInfo.phone || '未设置' }}</div>
+            </div>
+
+            <div class="form-group">
+              <label>邮箱</label>
+              <input v-if="isEditing" v-model="editForm.email" type="email" placeholder="请输入邮箱" />
+              <div v-else class="static-val">{{ userInfo.email || '未设置' }}</div>
+            </div>
           </div>
         </div>
 
@@ -52,6 +63,11 @@
             {{ loading ? '保存中...' : '保存修改' }}
           </button>
         </div>
+      </div>
+
+      <!-- Device Management (Embedded) -->
+      <div class="info-card device-card">
+        <DeviceBind @done="hasBoundDevice = true" />
       </div>
 
       <!-- Account Management -->
@@ -82,47 +98,70 @@
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
-import axios from 'axios'
+import { apiGet, apiPost } from '../../api/realApi'
 import { useRouter } from 'vue-router'
+import DeviceBind from './DeviceBind.vue'
 
 const router = useRouter()
 const userInfo = ref({})
 const isEditing = ref(false)
 const loading = ref(false)
 const showLogoutModal = ref(false)
+const hasBoundDevice = ref(false)
 
 const editForm = reactive({
   name: '',
-  classNum: '',
-  parentName: ''
+  parentName: '',
+  phone: '',
+  email: ''
 })
 
-onMounted(() => {
+onMounted(async () => {
+  // 先从 localStorage 快速显示
   const storedUser = JSON.parse(localStorage.getItem('user') || '{}')
-  // Merge defaults if missing from storage (for dev/demo)
   userInfo.value = {
     avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Felix',
     ...storedUser
   }
-  
-  // Init form
   Object.assign(editForm, userInfo.value)
+
+  // 再从后端获取最新资料
+  try {
+    const res = await apiGet('/api/parent/profile')
+    if (res.code === 200 && res.data) {
+      userInfo.value = { ...userInfo.value, ...res.data }
+      Object.assign(editForm, userInfo.value)
+      // 同步到 localStorage
+      localStorage.setItem('user', JSON.stringify(userInfo.value))
+    }
+  } catch (e) {
+    console.warn('获取最新资料失败，使用本地缓存', e)
+  }
 })
 
 const saveProfile = async () => {
   loading.value = true
   try {
-    const res = await axios.post('/api/parent/update', editForm)
-    if (res.data.code === 200) {
-      // Update local state and storage
-      userInfo.value = { ...userInfo.value, ...res.data.data }
+    const uid = userInfo.value.user_id || userInfo.value.studentId || userInfo.value.username || ''
+    const payload = {
+      user_id: uid,
+      name: editForm.name,
+      parentName: editForm.parentName,
+      phone: editForm.phone || undefined,
+      email: editForm.email || undefined
+    }
+    const res = await apiPost('/api/parent/update', payload)
+    if (res.code === 200) {
+      userInfo.value = { ...userInfo.value, name: editForm.name, parentName: editForm.parentName, phone: editForm.phone, email: editForm.email }
       localStorage.setItem('user', JSON.stringify(userInfo.value))
       isEditing.value = false
       alert('保存成功！')
+    } else {
+      alert(res.message || '保存失败')
     }
   } catch (err) {
     console.error(err)
-    alert('保存失败')
+    alert('保存失败：' + (err.message || '网络错误'))
   } finally {
     loading.value = false
   }
@@ -137,9 +176,23 @@ const confirmLogout = () => {
 
 <style scoped>
 .profile-container {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
   padding: 20px;
   max-width: 800px;
   margin: 0 auto;
+}
+
+.profile-content {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.device-card {
+  padding: 0;
+  overflow: hidden;
 }
 
 .section-header {
@@ -197,6 +250,12 @@ const confirmLogout = () => {
   flex-direction: column;
   align-items: center;
   width: 120px;
+}
+
+.readonly-hint {
+  font-size: 11px;
+  color: #94A3B8;
+  font-weight: 400;
 }
 
 .avatar-img {

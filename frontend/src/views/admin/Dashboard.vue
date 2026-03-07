@@ -61,7 +61,6 @@
           <span class="breadcrumb-item">{{ currentMenuTitle }}</span>
         </div>
         <div class="header-right">
-          <span class="current-semester">{{ currentSemester }}</span>
         </div>
       </header>
 
@@ -73,21 +72,18 @@
 </template>
 
 <script setup>
-import { ref, computed, defineAsyncComponent, onMounted } from 'vue'
+import { ref, computed, defineAsyncComponent } from 'vue'
 import { useRouter } from 'vue-router'
-import axios from 'axios'
 
 const router = useRouter()
 const currentView = ref('overview')
 const expandedMenus = ref(['user', 'academic', 'system'])
-const currentSemester = ref('')
 
 // 异步加载组件
 const OverviewPage = defineAsyncComponent(() => import('./Overview.vue'))
 const TeacherListPage = defineAsyncComponent(() => import('./TeacherList.vue'))
 const StudentListPage = defineAsyncComponent(() => import('./StudentList.vue'))
 const ClassListPage = defineAsyncComponent(() => import('./ClassList.vue'))
-const SemesterConfigPage = defineAsyncComponent(() => import('./SemesterConfig.vue'))
 const ExerciseDictPage = defineAsyncComponent(() => import('./ExerciseDict.vue'))
 const SystemLogPage = defineAsyncComponent(() => import('./SystemLog.vue'))
 
@@ -107,8 +103,7 @@ const menuList = [
     title: '教务管理', 
     icon: '🏫',
     children: [
-      { key: 'class', title: '班级管理' },
-      { key: 'semester', title: '学期设置' }
+      { key: 'class', title: '班级管理' }
     ]
   },
   { 
@@ -128,7 +123,6 @@ const currentComponent = computed(() => {
     teacher: TeacherListPage,
     student: StudentListPage,
     class: ClassListPage,
-    semester: SemesterConfigPage,
     exercise: ExerciseDictPage,
     log: SystemLogPage
   }
@@ -159,18 +153,6 @@ const logout = () => {
   localStorage.removeItem('admin-token')
   router.push('/admin/login')
 }
-
-onMounted(async () => {
-  try {
-    const res = await axios.get('/api/admin/semesters')
-    if (res.data.code === 200) {
-      const current = res.data.data.find(s => s.isCurrent)
-      if (current) currentSemester.value = current.name
-    }
-  } catch (e) {
-    console.error(e)
-  }
-})
 </script>
 
 <style scoped>
@@ -369,14 +351,6 @@ onMounted(async () => {
   font-size: 16px;
   font-weight: 600;
   color: #1f2937;
-}
-
-.current-semester {
-  font-size: 13px;
-  color: #6b7280;
-  background: #f3f4f6;
-  padding: 6px 12px;
-  border-radius: 6px;
 }
 
 .admin-content {

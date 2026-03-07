@@ -4,9 +4,15 @@
     <aside class="pc-sidebar">
       <div class="sidebar-header">
         <div class="logo">🐶 PuppyFit <span class="badge">教师端</span></div>
-        <div v-if="currentSemester" class="semester-tag">📅 {{ currentSemester }}</div>
       </div>
       <nav class="sidebar-nav">
+        <div 
+          :class="['nav-item', { active: currentView === 'overview' }]"
+          @click="currentView = 'overview'"
+        >
+          <span class="icon">🏠</span>
+          <span class="label">控制台</span>
+        </div>
         <div 
           :class="['nav-item', { active: currentView === 'assign' }]"
           @click="currentView = 'assign'"
@@ -56,6 +62,13 @@
     <!-- Mobile Nav -->
     <nav class="mobile-nav">
       <div 
+        :class="['nav-item', { active: currentView === 'overview' }]"
+        @click="currentView = 'overview'"
+      >
+        <span class="icon">🏠</span>
+        <span class="label">首页</span>
+      </div>
+      <div 
         :class="['nav-item', { active: currentView === 'assign' }]"
         @click="currentView = 'assign'"
       >
@@ -88,13 +101,13 @@
 </template>
 
 <script setup>
-import { ref, computed, defineAsyncComponent, onMounted } from 'vue'
+import { ref, computed, defineAsyncComponent } from 'vue'
 import { useRouter } from 'vue-router'
-import axios from 'axios'
 
 // Async components to avoid circular dependencies and load on demand
 const TaskAssign = defineAsyncComponent(() => import('./TaskAssign.vue'))
 const StudentGrades = defineAsyncComponent(() => import('./StudentGrades.vue'))
+const Overview = defineAsyncComponent(() => import('./Overview.vue'))
 // Reusing Profile from parent view or creating a teacher specific one? 
 // For now, let's assume we reuse or create a simple placeholder.
 // Ideally, we should refactor shared components.
@@ -102,34 +115,17 @@ const StudentGrades = defineAsyncComponent(() => import('./StudentGrades.vue'))
 const Profile = defineAsyncComponent(() => import('./Profile.vue')) 
 
 const router = useRouter()
-const currentView = ref('grades')
+const currentView = ref('overview')
 const user = ref(JSON.parse(localStorage.getItem('user') || '{}'))
-const currentSemester = ref('')
-
-// 获取当前学期
-const fetchCurrentSemester = async () => {
-  try {
-    const res = await axios.get('/api/admin/semesters')
-    if (res.data.code === 200) {
-      const current = res.data.data.find(s => s.isCurrent)
-      if (current) currentSemester.value = current.name
-    }
-  } catch (e) {
-    console.error(e)
-  }
-}
-
-onMounted(() => {
-  fetchCurrentSemester()
-})
 
 const currentComponent = computed(() => {
   switch (currentView.value) {
+    case 'overview': return Overview
     case 'assign': return TaskAssign
     case 'grades': return StudentGrades
     case 'chat': return null // Placeholder
     case 'profile': return Profile
-    default: return StudentGrades
+    default: return Overview
   }
 })
 
@@ -162,34 +158,26 @@ const logout = () => {
 }
 
 .sidebar-header {
-  padding: 24px;
+  padding: 20px 24px;
+  border-bottom: 1px solid #E2E8F0; /* Slate 200 */
 }
 
 .logo {
-  font-size: 20px;
-  font-weight: bold;
-  color: #34495e;
+  font-size: 18px;
+  font-weight: 700;
+  color: #0F172A; /* Slate 900 */
   gap: 8px;
   display: flex;
   align-items: center;
 }
 
 .badge {
-  font-size: 12px;
-  background: #faad14;
+  font-size: 11px;
+  background: #4F46E5; /* Indigo 600 */
   color: white;
   padding: 2px 6px;
   border-radius: 4px;
-}
-
-.semester-tag {
-  margin-top: 12px;
-  font-size: 12px;
-  color: #666;
-  background: #f5f5f5;
-  padding: 6px 12px;
-  border-radius: 6px;
-  border-left: 3px solid #1890ff;
+  font-weight: 500;
 }
 
 .sidebar-nav {
@@ -200,22 +188,23 @@ const logout = () => {
 .sidebar-nav .nav-item {
   display: flex;
   align-items: center;
-  padding: 12px 16px;
-  margin-bottom: 4px;
-  border-radius: 8px;
+  padding: 10px 14px;
+  margin-bottom: 2px;
+  border-radius: 6px;
   cursor: pointer;
-  color: #57606a;
-  transition: all 0.2s;
+  color: #475569; /* Slate 600 */
+  font-size: 14px;
+  transition: all 0.15s ease-in-out;
 }
 
 .sidebar-nav .nav-item:hover {
-  background-color: #f6f8fa;
-  color: #24292f;
+  background-color: #F8FAFC; /* Slate 50 */
+  color: #0F172A; /* Slate 900 */
 }
 
 .sidebar-nav .nav-item.active {
-  background-color: #e6f7ff;
-  color: #1890ff;
+  background-color: #EEF2FF; /* Indigo 50 */
+  color: #4F46E5; /* Indigo 600 */
   font-weight: 600;
 }
 
@@ -239,15 +228,16 @@ const logout = () => {
 }
 
 .avatar {
-  width: 32px;
-  height: 32px;
-  background: #faad14;
+  width: 28px;
+  height: 28px;
+  background: #4F46E5; /* Indigo 600 */
   color: white;
-  border-radius: 50%;
+  border-radius: 6px; /* Squircle */
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: bold;
+  font-weight: 600;
+  font-size: 13px;
 }
 
 .logout {
@@ -267,7 +257,7 @@ const logout = () => {
 }
 
 .content-wrapper {
-  max-width: 1000px;
+  max-width: 1100px; /* Slightly wider for data tables */
   margin: 0 auto;
 }
 
@@ -311,7 +301,7 @@ const logout = () => {
   }
   
   .mobile-nav .nav-item.active {
-    color: #1890ff;
+    color: #4F46E5;
   }
   
   .mobile-nav .icon {

@@ -98,7 +98,7 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import axios from 'axios'
+import { apiGet } from '../../api/realApi'
 
 const stats = ref({
   totalStudents: 0,
@@ -121,9 +121,9 @@ const formatDate = (dateStr) => {
 
 onMounted(async () => {
   try {
-    const res = await axios.get('/api/admin/dashboard')
-    if (res.data.code === 200) {
-      stats.value = res.data.data
+    const res = await apiGet('/api/admin/dashboard')
+    if (res.code === 200) {
+      stats.value = res.data
     }
   } catch (e) {
     console.error(e)

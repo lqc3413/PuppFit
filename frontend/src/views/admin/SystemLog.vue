@@ -21,7 +21,7 @@
         <div class="log-icon">{{ getActionIcon(log.action) }}</div>
         <div class="log-content">
           <div class="log-main">
-            <span class="log-operator">{{ log.operator }}</span>
+            <span class="log-operator">{{ log.operator || log.operatorName }}</span>
             <span class="log-action">{{ log.action }}</span>
             <span v-if="log.target" class="log-target">{{ log.target }}</span>
           </div>
@@ -39,7 +39,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import axios from 'axios'
+import { apiGet } from '../../api/realApi'
 
 const logs = ref([])
 const filterAction = ref('')
@@ -64,8 +64,8 @@ const getActionIcon = (action) => {
 }
 
 onMounted(async () => {
-  const res = await axios.get('/api/admin/logs')
-  if (res.data.code === 200) logs.value = res.data.data
+  const res = await apiGet('/api/admin/logs')
+  if (res.code === 200) logs.value = res.data
 })
 </script>
 

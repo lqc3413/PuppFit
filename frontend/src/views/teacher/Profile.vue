@@ -95,7 +95,7 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import axios from 'axios' // Use axios directly instead of API module
+import { apiPost } from '../../api/realApi'
 
 const router = useRouter()
 const userInfo = ref({})
@@ -131,13 +131,19 @@ onMounted(() => {
 const saveProfile = async () => {
   loading.value = true
   try {
-    const res = await axios.post('/api/teacher/update', editForm)
-    if (res.data.code === 200) {
+    // 后端要求 Query Params: name, phone
+    const params = new URLSearchParams()
+    if (editForm.name) params.append('name', editForm.name)
+    if (editForm.phone) params.append('phone', editForm.phone)
+    const res = await apiPost(`/api/teacher/update?${params.toString()}`)
+    if (res.code === 200) {
       // Update local state and storage
-      userInfo.value = { ...userInfo.value, ...res.data.data }
+      userInfo.value = { ...userInfo.value, name: editForm.name, phone: editForm.phone }
       localStorage.setItem('user', JSON.stringify(userInfo.value))
       isEditing.value = false
       alert('保存成功！')
+    } else {
+      alert(res.message || '保存失败')
     }
   } catch (err) {
     console.error(err)

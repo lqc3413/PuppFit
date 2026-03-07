@@ -68,13 +68,19 @@
                       v-model.number="tempScore" 
                       class="score-input"
                     />
-                    <button class="save-btn" @click="saveScore(record, result)">💾</button>
+                    <input 
+                      type="text" 
+                      v-model="tempReason" 
+                      class="reason-input"
+                      placeholder="修改原因（必填）"
+                    />
+                    <button class="save-btn" @click="saveScore(record, result)" :disabled="!tempReason.trim()">💾</button>
                     <button class="cancel-btn" @click="cancelEdit">❌</button>
                   </div>
-                  <div v-else class="view-box" @click.stop="startEdit(record, result)">
+                  <div v-else class="view-box">
                     <span class="ex-result">{{ result.score }} / {{ result.target }}</span>
                     <span class="ex-percent">{{ Math.min(100, Math.round(result.score / result.target * 100)) }}分</span>
-                    <span class="edit-icon">✏️</span>
+                    <button class="edit-btn" @click.stop="startEdit(record, result)">✏️ 修改</button>
                   </div>
                 </div>
               </div>
@@ -88,7 +94,7 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import axios from 'axios'
+import { apiGet, apiPost } from '../../api/realApi'
 
 const students = ref([])
 const loading = ref(true)
@@ -97,6 +103,7 @@ const selectedStudent = ref(null)
 
 const editingKey = ref(null)  // 格式: "recordId-exerciseType"
 const tempScore = ref(0)
+const tempReason = ref('')
 
 onMounted(async () => {
   await fetchStudents()
@@ -104,9 +111,9 @@ onMounted(async () => {
 
 const fetchStudents = async () => {
   try {
-    const res = await axios.get('/api/teacher/students')
-    if (res.data.code === 200) {
-      students.value = res.data.data
+    const res = await apiGet('/api/teacher/students')
+    if (res.code === 200) {
+      students.value = res.data
     }
   } finally {
     loading.value = false
@@ -131,20 +138,30 @@ const startEdit = (record, result) => {
 const cancelEdit = () => {
   editingKey.value = null
   tempScore.value = 0
+  tempReason.value = ''
 }
 
 const saveScore = async (record, result) => {
+  if (!tempReason.value.trim()) {
+    alert('请填写修改原因')
+    return
+  }
   try {
-    const res = await axios.post('/api/teacher/update_score', {
-      recordId: record.id,
-      exerciseType: result.type,
-      newScore: tempScore.value
+    // 从 localStorage 取教师ID
+    const user = JSON.parse(localStorage.getItem('user') || '{}')
+    const res = await apiPost('/api/teacher/update_score', {
+      record_id: record.id,
+      new_count: tempScore.value,
+      reason: tempReason.value.trim(),
+      teacher_id: String(user.id || user.employeeId || '')
     })
     
-    if (res.data.code === 200) {
+    if (res.code === 200) {
       // 更新本地数据
       result.score = tempScore.value
-      record.totalScore = res.data.data.totalScore
+      if (res.data?.totalScore !== undefined) {
+        record.totalScore = res.data.totalScore
+      }
       
       // 重新计算学生平均分
       const student = selectedStudent.value
@@ -155,6 +172,8 @@ const saveScore = async (record, result) => {
       }
       
       cancelEdit()
+    } else {
+      alert(res.message || '修改失败')
     }
   } catch (e) {
     alert('修改失败')
@@ -164,8 +183,13 @@ const saveScore = async (record, result) => {
 
 <style scoped>
 .section-header { margin-bottom: 24px; }
-.section-header h2 { color: #2c3e50; margin-bottom: 8px; }
-.section-header p { color: #7f8c8d; }
+.section-header h2 { 
+  color: #0F172A; /* Slate 900 */
+  margin-bottom: 8px; 
+  font-weight: 700;
+  font-size: 20px;
+}
+.section-header p { color: #64748B; /* Slate 500 */ font-size: 14px; }
 
 .student-list {
   display: grid;
@@ -175,42 +199,43 @@ const saveScore = async (record, result) => {
 
 .student-card {
   background: white;
-  padding: 20px;
-  border-radius: 12px;
+  padding: 16px 20px;
+  border-radius: 8px;
   display: flex;
   align-items: center;
-  border: 1px solid #eaedf0;
+  border: 1px solid #E2E8F0; /* Slate 200 */
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.15s ease-in-out;
 }
 
 .student-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 8px 24px rgba(0,0,0,0.05);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+  border-color: #CBD5E1;
 }
 
 .student-card .avatar {
-  width: 48px;
-  height: 48px;
-  background: #e6f7ff;
-  color: #1890ff;
-  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  background: #EEF2FF; /* Indigo 50 */
+  color: #4F46E5; /* Indigo 600 */
+  border-radius: 6px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: bold;
-  font-size: 20px;
+  font-weight: 600;
+  font-size: 16px;
   margin-right: 16px;
   flex-shrink: 0;
 }
 
 .student-card .info { flex: 1; min-width: 0; }
-.student-card h3 { margin: 0 0 4px 0; color: #2c3e50; }
-.student-card .meta { margin: 0; color: #999; font-size: 12px; }
+.student-card h3 { margin: 0 0 2px 0; color: #0F172A; font-size: 16px; font-weight: 600; }
+.student-card .meta { margin: 0; color: #64748B; font-size: 12px; }
 
 .score-badge { text-align: right; flex-shrink: 0; }
-.score-badge .label { display: block; font-size: 12px; color: #999; }
-.score-badge .val { font-size: 24px; font-weight: bold; color: #1890ff; }
+.score-badge .label { display: block; font-size: 11px; color: #64748B; font-weight: 500; }
+.score-badge .val { font-size: 20px; font-weight: 700; color: #4F46E5; }
 
 /* Modal Styles */
 .modal-overlay {
@@ -227,11 +252,12 @@ const saveScore = async (record, result) => {
 .modal-content {
   background: white;
   width: 100%;
-  max-width: 600px;
-  border-radius: 16px;
+  max-width: 640px;
+  border-radius: 8px;
   padding: 24px;
-  max-height: 80vh;
+  max-height: 85vh;
   overflow-y: auto;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
 }
 
 .modal-header {
@@ -243,7 +269,9 @@ const saveScore = async (record, result) => {
 
 .modal-header h3 {
   margin: 0;
-  color: #2c3e50;
+  color: #0F172A;
+  font-size: 18px;
+  font-weight: 600;
 }
 
 .close-btn {
@@ -256,11 +284,10 @@ const saveScore = async (record, result) => {
   padding: 40px;
 }
 
-/* 任务记录样式 */
 .task-record {
   margin-bottom: 20px;
-  border: 1px solid #e8e8e8;
-  border-radius: 12px;
+  border: 1px solid #E2E8F0;
+  border-radius: 6px;
   overflow: hidden;
 }
 
@@ -268,8 +295,9 @@ const saveScore = async (record, result) => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 16px;
-  background: #fafafa;
+  padding: 12px 16px;
+  background: #F8FAFC;
+  border-bottom: 1px solid #E2E8F0;
 }
 
 .task-info {
@@ -279,13 +307,14 @@ const saveScore = async (record, result) => {
 
 .task-title {
   font-weight: 600;
-  color: #2c3e50;
+  color: #0F172A;
+  font-size: 14px;
 }
 
 .task-date {
-  font-size: 12px;
-  color: #999;
-  margin-top: 4px;
+  font-size: 11px;
+  color: #64748B;
+  margin-top: 2px;
 }
 
 .task-score {
@@ -293,9 +322,9 @@ const saveScore = async (record, result) => {
 }
 
 .score-num {
-  font-size: 28px;
-  font-weight: bold;
-  color: #1890ff;
+  font-size: 24px;
+  font-weight: 700;
+  color: #4F46E5;
 }
 
 .score-label {
@@ -313,8 +342,8 @@ const saveScore = async (record, result) => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px 0;
-  border-bottom: 1px dashed #e8e8e8;
+  padding: 10px 0;
+  border-bottom: 1px solid #F1F5F9;
 }
 
 .exercise-row:last-child {
@@ -323,7 +352,8 @@ const saveScore = async (record, result) => {
 
 .ex-type {
   font-weight: 500;
-  color: #34495e;
+  color: #334155;
+  font-size: 13px;
 }
 
 .ex-score-area {
@@ -335,26 +365,37 @@ const saveScore = async (record, result) => {
   display: flex;
   align-items: center;
   gap: 8px;
-  cursor: pointer;
 }
 
 .ex-result {
-  color: #666;
+  color: #475569;
+  font-size: 13px;
 }
 
 .ex-percent {
-  color: #1890ff;
-  font-weight: bold;
+  color: #4F46E5;
+  font-weight: 600;
+  font-size: 13px;
 }
 
-.edit-icon {
-  opacity: 0;
-  transition: opacity 0.2s;
-  font-size: 14px;
+.edit-btn {
+  padding: 4px 10px;
+  font-size: 12px;
+  background: #fff;
+  color: #4F46E5;
+  border: 1px solid #C7D2FE;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.15s;
+  white-space: nowrap;
+  margin-left: 4px;
 }
 
-.view-box:hover .edit-icon {
-  opacity: 1;
+.edit-btn:hover {
+  background: #4F46E5;
+  color: #fff;
+  border-color: #4F46E5;
 }
 
 .edit-box {
@@ -364,11 +405,17 @@ const saveScore = async (record, result) => {
 }
 
 .score-input {
-  width: 80px;
-  padding: 6px;
-  border: 1px solid #1890ff;
+  width: 70px;
+  padding: 4px 8px;
+  border: 1px solid #4F46E5;
   border-radius: 4px;
-  font-size: 14px;
+  font-size: 13px;
+  color: #0F172A;
+}
+
+.score-input:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.2);
 }
 
 .save-btn, .cancel-btn {
@@ -376,5 +423,29 @@ const saveScore = async (record, result) => {
   border: none;
   cursor: pointer;
   font-size: 16px;
+}
+
+.save-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.reason-input {
+  width: 100px;
+  padding: 4px 8px;
+  border: 1px solid #CBD5E1;
+  border-radius: 4px;
+  font-size: 12px;
+  color: #0F172A;
+}
+
+.reason-input:focus {
+  outline: none;
+  border-color: #4F46E5;
+  box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.2);
+}
+
+.edit-box {
+  flex-wrap: wrap;
 }
 </style>

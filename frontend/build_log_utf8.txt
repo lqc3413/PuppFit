@@ -1,0 +1,101 @@
+﻿
+> frontend@0.0.0 build
+> vite build
+
+[36mvite v7.3.1 [32mbuilding client environment for production...[36m[39m
+transforming...
+[32m鉁?[39m 23 modules transformed.
+node.exe : [31m鉁?[39m
+ Build failed in 226ms
+所在位置 行:1 字符: 1
++ & "D:\DevTools/node.
+exe" "D:\DevTools/node
+_modules/npm/bin/npm-c
+li.js ...
++ ~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~
+~~~~~
+    + CategoryInfo    
+          : NotSpeci  
+  fied: ([31m鉁?[39   
+ m Build failed in    
+ 226ms:String) []    ,
+ RemoteException
+    + FullyQualifiedE 
+   rrorId : NativeCo  
+  mmandError
+ 
+[31merror during buil
+d:
+[31m[vite:vue] Cannot
+ read properties of un
+defined (reading 'type
+')[31m
+file: [36mC:/Users/lq
+c/Desktop/PuppyFit _1/
+frontend/src/views/par
+ent/Dashboard.vue[31m
+    at genNode (C:\Use
+rs\lqc\Desktop\PuppyFi
+t _1\frontend\node_mod
+ules\@vue\compiler-cor
+e\dist\compiler-core.c
+js.prod.js:4004:16)
+    at genNode (C:\Use
+rs\lqc\Desktop\PuppyFi
+t _1\frontend\node_mod
+ules\@vue\compiler-cor
+e\dist\compiler-core.c
+js.prod.js:4008:7)
+    at genNodeList (C:
+\Users\lqc\Desktop\Pup
+pyFit _1\frontend\node
+_modules\@vue\compiler
+-core\dist\compiler-co
+re.cjs.prod.js:3983:7)
+    at genNodeListAsAr
+ray (C:\Users\lqc\Desk
+top\PuppyFit _1\fronte
+nd\node_modules\@vue\c
+ompiler-core\dist\comp
+iler-core.cjs.prod.js:
+3970:3)
+    at genNodeList (C:
+\Users\lqc\Desktop\Pup
+pyFit _1\frontend\node
+_modules\@vue\compiler
+-core\dist\compiler-co
+re.cjs.prod.js:3981:7)
+    at genVNodeCall (C
+:\Users\lqc\Desktop\Pu
+ppyFit _1\frontend\nod
+e_modules\@vue\compile
+r-core\dist\compiler-c
+ore.cjs.prod.js:4152:3
+)
+    at genNode (C:\Use
+rs\lqc\Desktop\PuppyFi
+t _1\frontend\node_mod
+ules\@vue\compiler-cor
+e\dist\compiler-core.c
+js.prod.js:4029:7)
+    at genNode (C:\Use
+rs\lqc\Desktop\PuppyFi
+t _1\frontend\node_mod
+ules\@vue\compiler-cor
+e\dist\compiler-core.c
+js.prod.js:4008:7)
+    at genNodeList (C:
+\Users\lqc\Desktop\Pup
+pyFit _1\frontend\node
+_modules\@vue\compiler
+-core\dist\compiler-co
+re.cjs.prod.js:3983:7)
+    at genNodeListAsAr
+ray (C:\Users\lqc\Desk
+top\PuppyFit _1\fronte
+nd\node_modules\@vue\c
+ompiler-core\dist\comp
+iler-core.cjs.prod.js:
+3970:3)[39m

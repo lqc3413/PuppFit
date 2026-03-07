@@ -1,109 +1,101 @@
 <template>
   <div class="task-assign-page">
     <header class="section-header">
-      <h2>发布新任务 📝</h2>
-      <p>为班级同学布置新的运动挑战（可包含多项运动）</p>
+      <h2>发布运动任务 🐶</h2>
+      <p>为学生布置仰卧起坐/体能测试任务（通过机器狗设备执行）</p>
     </header>
 
     <div class="form-card">
       <div class="form-group">
-        <label>任务标题</label>
-        <input v-model="form.title" type="text" placeholder="例如：第一周体能测试" />
-      </div>
-
-      <div class="form-group">
-        <label>截止日期</label>
-        <div class="date-selects">
-          <select v-model="form.year">
-            <option v-for="y in yearOptions" :key="y" :value="y">{{ y }}年</option>
-          </select>
-          <select v-model="form.month">
-            <option v-for="m in 12" :key="m" :value="m">{{ m }}月</option>
-          </select>
-          <select v-model="form.day">
-            <option v-for="d in daysInMonth" :key="d" :value="d">{{ d }}日</option>
-          </select>
-        </div>
-      </div>
-
-      <!-- 多项运动列表 -->
-      <div class="exercises-section">
-        <div class="exercises-header">
-          <label>运动项目</label>
-          <button class="btn-add" @click="addExercise">+ 添加运动</button>
-        </div>
-
-        <div v-for="(exercise, index) in form.exercises" :key="index" class="exercise-row">
-          <select v-model="exercise.type" @change="onExerciseTypeChange(exercise)">
-            <option v-for="et in activeExerciseTypes" :key="et.id" :value="et.name">{{ et.name }}</option>
-          </select>
-          
-          <div class="input-with-unit">
-            <input v-model.number="exercise.target" type="number" placeholder="目标" />
-            <span class="unit-label">{{ getExerciseUnit(exercise.type) }}</span>
-          </div>
-          
-          <div class="input-with-unit weight-input">
-            <input v-model.number="exercise.weight" type="number" step="0.1" min="0" max="1" placeholder="权重" />
-            <span class="unit-label">权重</span>
-          </div>
-          
-          <button class="btn-remove" @click="removeExercise(index)" v-if="form.exercises.length > 1">×</button>
-        </div>
-
-        <div class="weight-hint" :class="{ error: totalWeight !== 1 }">
-          权重总和: {{ totalWeight.toFixed(1) }} {{ totalWeight === 1 ? '✓' : '(需要等于 1.0)' }}
-        </div>
-      </div>
-
-      <div class="form-group">
-        <label>分配对象</label>
-        <select disabled>
-          <option>三年级二班 (全体)</option>
+        <label>选择学生 *</label>
+        <select v-model="form.user_id" @change="onStudentChange">
+          <option value="">请选择学生</option>
+          <option v-for="s in studentList" :key="s.id" :value="s.studentId">
+            {{ s.name }}（{{ s.studentId }} · {{ s.className }}）
+          </option>
         </select>
       </div>
 
+      <div class="form-group">
+        <label>选择设备 *</label>
+        <div v-if="loadingDevices" class="device-loading">
+          🔍 正在查询该学生绑定的设备...
+        </div>
+        <select v-else-if="studentDevices.length > 0" v-model="form.device_id">
+          <option value="">请选择设备</option>
+          <option v-for="d in studentDevices" :key="d.device_id" :value="d.device_id">
+            {{ d.device_name || d.device_id }}（{{ d.device_id }}）{{ d.status === 'online' ? ' ✅在线' : ' ⚪离线' }}
+          </option>
+        </select>
+        <div v-else-if="form.user_id && !loadingDevices" class="device-empty">
+          ⚠️ 该学生暂未绑定任何设备，请通知家长先在 App 中绑定设备
+        </div>
+        <div v-else class="device-placeholder">
+          请先选择学生
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>运动类型</label>
+        <select v-model="form.exercise_type">
+          <option v-for="et in exerciseTypeOptions" :key="et.value" :value="et.value">
+            {{ et.label }}
+          </option>
+        </select>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>目标次数</label>
+          <div class="input-with-unit">
+            <input v-model.number="form.target_count" type="number" min="1" placeholder="30" />
+            <span class="unit-label">{{ currentUnit }}</span>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>时限</label>
+          <div class="input-with-unit">
+            <input v-model.number="form.duration_limit" type="number" min="10" placeholder="60" />
+            <span class="unit-label">秒</span>
+          </div>
+        </div>
+      </div>
+
       <div class="form-actions">
-        <button class="btn-submit" @click="publishTask" :disabled="submitting || totalWeight !== 1">
+        <button class="btn-submit" @click="publishTask" :disabled="submitting || !form.device_id || !form.user_id">
           {{ submitting ? '发布中...' : '确认发布' }}
         </button>
       </div>
     </div>
 
-    <!-- 学生待办任务列表 -->
+    <!-- 已发布待完成任务列表 -->
     <div class="pending-section">
       <header class="section-header">
         <h2>学生待办任务 📝</h2>
-        <p>查看每位学生的未完成任务</p>
+        <p>已发布的运动任务，等待学生在机器狗上完成</p>
       </header>
 
-      <div class="students-grid">
-        <div v-for="student in studentsPending" :key="student.studentId" class="student-card">
-          <div class="student-header">
-            <div class="student-avatar">{{ student.studentName[0] }}</div>
-            <div class="student-info">
-              <h4>{{ student.studentName }}</h4>
-              <span class="student-class">{{ student.class }}</span>
-            </div>
-            <div class="pending-badge" :class="{ warning: student.pendingCount > 0 }">
-              {{ student.pendingCount }} 待办
-            </div>
-          </div>
+      <div v-if="pendingTaskList.length === 0" class="no-pending">
+        <span class="emoji">🎉</span>
+        <span>暂无待办任务</span>
+      </div>
 
-          <div class="pending-list" v-if="student.pendingTasks.length > 0">
-            <div v-for="task in student.pendingTasks" :key="task.id" class="pending-item">
-              <div class="task-icon">🔥</div>
-              <div class="task-content">
-                <span class="task-title">{{ task.title }}</span>
-                <span class="task-meta">
-                  {{ task.exerciseCount }} 项运动 · 截止 {{ task.deadline }}
-                </span>
-              </div>
+      <div class="tasks-list" v-else>
+        <div v-for="task in pendingTaskList" :key="task.id" class="task-card">
+          <div class="task-card-header">
+            <div class="task-icon">🐶</div>
+            <div class="task-info">
+              <span class="task-title">{{ task.exerciseLabel || task.exercise_type }}</span>
+              <span class="task-meta">目标 {{ task.target_count }}个 · 时限 {{ task.duration_limit }}秒</span>
+            </div>
+            <div class="task-status-tag" :class="task.status">
+              {{ task.status === 'created' ? '待完成' : task.status === 'running' ? '进行中' : task.status }}
             </div>
           </div>
-          <div v-else class="no-pending">
-            <span class="emoji">🎉</span>
-            <span>太棒了！所有任务已完成</span>
+          <div class="task-card-body">
+            <span class="task-detail">👤 {{ task.studentName || task.user_id }}</span>
+            <span class="task-detail">📱 {{ task.deviceName || task.device_id }}</span>
+            <span class="task-detail">📅 {{ task.deadline || task.createdAt || '-' }}</span>
           </div>
         </div>
       </div>
@@ -112,158 +104,168 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
-import axios from 'axios'
+import { ref, computed, onMounted, watch } from 'vue'
+import { apiGet, apiPost } from '../../api/realApi'
 
-// 运动项目类型列表（从管理员配置获取）
-const exerciseTypes = ref([])
+// 运动类型选项（从后端动态获取）
+const exerciseTypeOptions = ref([])
 
-// 只显示启用的运动项目
-const activeExerciseTypes = computed(() => 
-  exerciseTypes.value.filter(et => et.status === 'active')
-)
-
-const form = ref({
-  title: '',
-  year: 2026,
-  month: 1,
-  day: 20,
-  exercises: []
-})
-
-const submitting = ref(false)
-const studentsPending = ref([])
-
-// 获取运动项目库（从管理员配置）
+// 从后端获取运动项目列表
 const fetchExerciseTypes = async () => {
   try {
-    const res = await axios.get('/api/admin/exercise-types')
-    if (res.data.code === 200) {
-      exerciseTypes.value = res.data.data
-      // 初始化默认运动项目
-      if (activeExerciseTypes.value.length > 0) {
-        const firstType = activeExerciseTypes.value[0]
-        form.value.exercises = [
-          { type: firstType.name, target: 50, weight: 0.5 },
-          { type: activeExerciseTypes.value[1]?.name || firstType.name, target: 100, weight: 0.5 }
-        ]
+    const res = await apiGet('/api/admin/exercise-types')
+    if (res.code === 200) {
+      const list = res.data.exercises || res.data || []
+      const activeList = list.filter(e => e.status === 'active' || !e.status)
+      exerciseTypeOptions.value = activeList.map(e => ({
+        value: e.name,
+        label: e.name,
+        unit: e.unit || '个'
+      }))
+      // 默认选中第一个
+      if (!form.value.exercise_type && exerciseTypeOptions.value.length > 0) {
+        form.value.exercise_type = exerciseTypeOptions.value[0].value
       }
+    } else {
+      console.warn('获取运动项目返回非200:', res)
     }
   } catch (err) {
-    console.error('获取运动项目失败:', err)
+    console.error('获取运动项目列表失败:', err.message || err)
   }
 }
 
-// 获取运动项目单位
-const getExerciseUnit = (typeName) => {
-  const et = exerciseTypes.value.find(e => e.name === typeName)
+const studentList = ref([])
+const studentDevices = ref([])  // 当前选中学生的绑定设备
+const loadingDevices = ref(false)
+
+const form = ref({
+  device_id: '',
+  user_id: '',
+  exercise_type: '',
+  target_count: 30,
+  duration_limit: 60
+})
+
+const submitting = ref(false)
+const pendingTaskList = ref([])
+
+const currentUnit = computed(() => {
+  const et = exerciseTypeOptions.value.find(e => e.value === form.value.exercise_type)
   return et ? et.unit : '个'
+})
+
+// 选择学生后自动查询绑定设备
+const onStudentChange = async () => {
+  form.value.device_id = ''
+  studentDevices.value = []
+  const userId = form.value.user_id
+  if (!userId) return
+
+  loadingDevices.value = true
+  try {
+    const res = await apiGet(`/api/devices/list/${userId}`)
+    if (res.code === 200 && res.data?.length > 0) {
+      studentDevices.value = res.data
+      // 如果只有一个设备，自动选中
+      if (res.data.length === 1) {
+        form.value.device_id = res.data[0].device_id
+      }
+    }
+  } catch (err) {
+    console.error('获取学生设备失败:', err)
+  } finally {
+    loadingDevices.value = false
+  }
 }
 
-// 运动类型变更时更新单位
-const onExerciseTypeChange = (exercise) => {
-  // 触发响应式更新
+// 获取学生列表（用于下拉选择）
+const fetchStudents = async () => {
+  try {
+    const res = await apiGet('/api/teacher/students')
+    if (res.code === 200) {
+      studentList.value = res.data
+    }
+  } catch (err) {
+    console.error('获取学生列表失败:', err)
+  }
 }
 
-// 获取学生待办任务
+// 获取已发布的待完成任务（使用正确的 /api/teacher/tasks 接口）
 const fetchPendingTasks = async () => {
   try {
-    const res = await axios.get('/api/teacher/pending_tasks')
-    if (res.data.code === 200) {
-      studentsPending.value = res.data.data
+    const res = await apiGet('/api/teacher/tasks?limit=50')
+    console.log('[PendingTasks] 后端返回:', JSON.stringify(res).slice(0, 800))
+    if (res.code === 200) {
+      const rawData = res.data
+      // 后端可能返回数组或 { tasks: [...] } 格式
+      const tasks = Array.isArray(rawData) ? rawData : (rawData.tasks || rawData.list || [])
+      
+      // 将任务列表处理并匹配学生信息
+      pendingTaskList.value = tasks.map(t => {
+        const student = studentList.value.find(s => 
+          s.studentId === t.user_id || s.id === t.user_id
+        )
+        // 匹配运动类型名称
+        const et = exerciseTypeOptions.value.find(e => e.value === t.exercise_type)
+        return {
+          ...t,
+          studentName: student?.name || t.user_name || t.user_id || '未知',
+          deviceName: t.device_name || t.device_id || '-',
+          exerciseLabel: et?.label || t.exercise_type || '运动任务'
+        }
+      })
     }
   } catch (err) {
     console.error('获取待办任务失败:', err)
   }
 }
 
-onMounted(() => {
-  fetchExerciseTypes()
+onMounted(async () => {
+  await Promise.all([fetchStudents(), fetchExerciseTypes()])
+  // 确保有默认选中的运动类型
+  if (!form.value.exercise_type && exerciseTypeOptions.value.length > 0) {
+    form.value.exercise_type = exerciseTypeOptions.value[0].value
+  }
   fetchPendingTasks()
 })
 
-// 年份选项（2025-2030）
-const yearOptions = [2025, 2026, 2027, 2028, 2029, 2030]
-
-// 根据月份计算天数
-const daysInMonth = computed(() => {
-  const year = form.value.year
-  const month = form.value.month
-  return new Date(year, month, 0).getDate()
-})
-
-// 格式化截止日期
-const formattedDeadline = computed(() => {
-  const y = form.value.year
-  const m = String(form.value.month).padStart(2, '0')
-  const d = String(form.value.day).padStart(2, '0')
-  return `${y}-${m}-${d}`
-})
-
-// 计算权重总和
-const totalWeight = computed(() => {
-  return form.value.exercises.reduce((sum, e) => sum + (e.weight || 0), 0)
-})
-
-// 添加运动项目
-const addExercise = () => {
-  const defaultType = activeExerciseTypes.value[0]?.name || '跳绳'
-  form.value.exercises.push({ type: defaultType, target: 30, weight: 0 })
-}
-
-// 移除运动项目
-const removeExercise = (index) => {
-  form.value.exercises.splice(index, 1)
-}
-
 const publishTask = async () => {
-  if (!form.value.title) {
-    alert('请填写任务标题')
+  if (!form.value.device_id) {
+    alert('请选择设备')
     return
   }
-  
-  if (form.value.exercises.length === 0) {
-    alert('请至少添加一项运动')
-    return
-  }
-  
-  if (totalWeight.value !== 1) {
-    alert('所有运动的权重总和必须等于 1.0')
+  if (!form.value.user_id) {
+    alert('请选择学生')
     return
   }
 
   submitting.value = true
   try {
-    // 构建运动数据（单位从运动项目库获取）
-    const exercises = form.value.exercises.map(e => ({
-      type: e.type,
-      target: e.target,
-      unit: getExerciseUnit(e.type),
-      weight: e.weight
-    }))
-
-    const res = await axios.post('/api/teacher/publish_task', {
-      title: form.value.title,
-      deadline: formattedDeadline.value,
-      exercises
+    const res = await apiPost('/api/teacher/publish_task', {
+      device_id: form.value.device_id.trim(),
+      user_id: form.value.user_id,
+      exercise_type: form.value.exercise_type,
+      target_count: form.value.target_count,
+      duration_limit: form.value.duration_limit
     })
-    
-    if (res.data.code === 200) {
+
+    if (res.code === 200) {
+      console.log('[PublishTask] 发布成功，后端返回:', JSON.stringify(res.data).slice(0, 300))
+      
       alert('任务发布成功！')
-      // 刷新学生待办任务列表
-      await fetchPendingTasks()
       // 重置表单
-      const firstType = activeExerciseTypes.value[0]
       form.value = {
-        title: '',
-        year: 2026,
-        month: 1,
-        day: 20,
-        exercises: [
-          { type: firstType?.name || '跳绳', target: 50, weight: 0.5 },
-          { type: activeExerciseTypes.value[1]?.name || firstType?.name || '跳绳', target: 100, weight: 0.5 }
-        ]
+        device_id: '',
+        user_id: '',
+        exercise_type: exerciseTypeOptions.value.length > 0 ? exerciseTypeOptions.value[0].value : '',
+        target_count: 30,
+        duration_limit: 60
       }
+      studentDevices.value = []
+      // 后端 publish_task 和 tasks 数据已互通（2026-03-06 验证），直接刷新列表
+      await fetchPendingTasks()
+    } else {
+      alert(res.message || '发布失败')
     }
   } catch (e) {
     console.error(e)
@@ -280,19 +282,23 @@ const publishTask = async () => {
 }
 
 .section-header h2 {
-  color: #2c3e50;
+  color: #0F172A; /* Slate 900 */
   margin-bottom: 8px;
+  font-weight: 700;
+  font-size: 20px;
 }
 
 .section-header p {
-  color: #7f8c8d;
+  color: #64748B; /* Slate 500 */
+  font-size: 14px;
 }
 
 .form-card {
   background: white;
-  padding: 32px;
-  border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+  padding: 24px;
+  border-radius: 8px;
+  border: 1px solid #E2E8F0; /* Slate 200 */
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
   max-width: 700px;
 }
 
@@ -300,27 +306,81 @@ const publishTask = async () => {
   margin-bottom: 20px;
 }
 
+.device-loading {
+  padding: 10px 14px;
+  font-size: 13px;
+  color: #4F46E5;
+  background: #EEF2FF;
+  border: 1px solid #C7D2FE;
+  border-radius: 6px;
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+.device-empty {
+  padding: 10px 14px;
+  font-size: 13px;
+  color: #D97706;
+  background: #FFFBEB;
+  border: 1px solid #FDE68A;
+  border-radius: 6px;
+}
+
+.device-placeholder {
+  padding: 10px 14px;
+  font-size: 13px;
+  color: #94A3B8;
+  background: #F8FAFC;
+  border: 1px dashed #CBD5E1;
+  border-radius: 6px;
+}
+
 label {
   display: block;
-  margin-bottom: 8px;
-  font-weight: 500;
-  color: #34495e;
+  margin-bottom: 6px;
+  font-weight: 600;
+  font-size: 13px;
+  color: #334155; /* Slate 700 */
 }
 
 input, select {
   width: 100%;
-  padding: 10px 12px;
-  border: 1px solid #d9d9d9;
+  padding: 8px 12px;
+  border: 1px solid #CBD5E1; /* Slate 300 */
   border-radius: 6px;
   font-size: 14px;
-  transition: all 0.2s;
+  color: #0F172A;
+  transition: all 0.15s ease-in-out;
   box-sizing: border-box;
+  background-color: #fff;
 }
 
 input:focus, select:focus {
-  border-color: #1890ff;
+  border-color: #4F46E5; /* Indigo 600 */
   outline: none;
-  box-shadow: 0 0 0 2px rgba(24,144,255,0.2);
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+}
+
+.form-row {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.form-row .form-group {
+  flex: 1;
+  margin-bottom: 0;
+}
+
+.field-hint {
+  display: block;
+  font-size: 12px;
+  color: #94A3B8;
+  margin-top: 4px;
 }
 
 /* 日期选择器 */
@@ -337,8 +397,9 @@ input:focus, select:focus {
 .exercises-section {
   margin-bottom: 20px;
   padding: 16px;
-  background: #fafafa;
-  border-radius: 8px;
+  background: #F8FAFC; /* Slate 50 */
+  border: 1px solid #E2E8F0;
+  border-radius: 6px;
 }
 
 .exercises-header {
@@ -353,17 +414,20 @@ input:focus, select:focus {
 }
 
 .btn-add {
-  background: #52c41a;
-  color: white;
-  border: none;
-  padding: 6px 12px;
+  background: white;
+  color: #0F172A;
+  border: 1px solid #CBD5E1;
+  padding: 4px 10px;
   border-radius: 4px;
   cursor: pointer;
   font-size: 13px;
+  font-weight: 500;
+  transition: all 0.15s;
 }
 
 .btn-add:hover {
-  background: #73d13d;
+  background: #F1F5F9;
+  border-color: #94A3B8;
 }
 
 .exercise-row {
@@ -426,46 +490,56 @@ input:focus, select:focus {
 }
 
 .btn-remove {
-  background: #ff4d4f;
-  color: white;
-  border: none;
+  background: transparent;
+  color: #EF4444; /* Red 500 */
+  border: 1px solid transparent;
   width: 28px;
   height: 28px;
-  border-radius: 50%;
+  border-radius: 4px;
   cursor: pointer;
-  font-size: 16px;
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
+  transition: all 0.15s;
+}
+
+.btn-remove:hover {
+  background: #FEF2F2; /* Red 50 */
+  border-color: #FCA5A5; /* Red 300 */
 }
 
 .weight-hint {
   font-size: 12px;
-  color: #52c41a;
+  color: #10B981; /* Emerald 500 */
   margin-top: 8px;
 }
 
 .weight-hint.error {
-  color: #ff4d4f;
+  color: #EF4444; /* Red 500 */
 }
 
 .btn-submit {
   width: 100%;
-  padding: 12px;
-  background: #1890ff;
+  padding: 10px;
+  background: #4F46E5; /* Indigo 600 */
   color: white;
   border: none;
-  border-radius: 8px;
-  font-size: 16px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
   cursor: pointer;
-  transition: background 0.2s;
+  transition: background 0.15s;
   margin-top: 12px;
 }
 
 .btn-submit:hover {
-  background: #40a9ff;
+  background: #4338CA; /* Indigo 700 */
 }
 
 .btn-submit:disabled {
-  background: #d9d9d9;
+  background: #CBD5E1; /* Slate 300 */
   cursor: not-allowed;
 }
 
@@ -478,26 +552,95 @@ input:focus, select:focus {
   margin-bottom: 24px;
 }
 
-.students-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 20px;
+.tasks-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.task-card {
+  background: white;
+  border-radius: 8px;
+  padding: 16px;
+  border: 1px solid #E2E8F0;
+  transition: all 0.15s ease-in-out;
+}
+
+.task-card:hover {
+  border-color: #CBD5E1;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+
+.task-card-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.task-card-header .task-icon {
+  font-size: 24px;
+  width: 40px;
+  height: 40px;
+  background: #EEF2FF;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.task-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.task-status-tag {
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.task-status-tag.created {
+  background: #FFFBEB;
+  color: #D97706;
+  border: 1px solid #FDE68A;
+}
+
+.task-status-tag.running {
+  background: #EEF2FF;
+  color: #4F46E5;
+  border: 1px solid #C7D2FE;
+}
+
+.task-card-body {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding-left: 52px;
+}
+
+.task-detail {
+  font-size: 13px;
+  color: #64748B;
 }
 
 .student-card {
   background: white;
-  border-radius: 16px;
-  padding: 24px;
-  border: 1px solid #f0f2f5;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 8px;
+  padding: 20px;
+  border: 1px solid #E2E8F0;
+  transition: all 0.15s ease-in-out;
   position: relative;
   overflow: hidden;
 }
 
 .student-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.08);
-  border-color: transparent;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  border-color: #CBD5E1;
 }
 
 .student-header {
@@ -508,17 +651,16 @@ input:focus, select:focus {
 }
 
 .student-avatar {
-  width: 48px;
-  height: 48px;
-  background: linear-gradient(135deg, #FF9A9E 0%, #FECFEF 100%);
-  color: #fff;
-  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  background: #EEF2FF; /* Indigo 50 */
+  color: #4F46E5; /* Indigo 600 */
+  border-radius: 6px; /* Squircle */
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 20px;
+  font-size: 16px;
   font-weight: 700;
-  box-shadow: 0 4px 12px rgba(255, 154, 158, 0.3);
 }
 
 .student-info {
@@ -533,30 +675,30 @@ input:focus, select:focus {
 }
 
 .student-class {
-  font-size: 13px;
-  color: #8c8c8c;
+  font-size: 12px;
+  color: #64748B;
   display: inline-block;
-  background: #f5f5f5;
-  padding: 2px 8px;
+  background: #F8FAFC;
+  padding: 2px 6px;
   border-radius: 4px;
+  border: 1px solid #E2E8F0;
 }
 
 .pending-badge {
-  padding: 6px 14px;
-  border-radius: 20px;
-  font-size: 13px;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
   font-weight: 600;
-  background: #f6ffed;
-  color: #52c41a;
-  border: 1px solid #b7eb8f;
-  transition: all 0.3s;
+  background: #F0FDF4; /* Green 50 */
+  color: #16A34A; /* Green 600 */
+  border: 1px solid #BBF7D0; /* Green 200 */
+  transition: all 0.15s;
 }
 
 .pending-badge.warning {
-  background: #fff7e6;
-  color: #fa8c16;
-  border-color: #ffd591;
-  box-shadow: 0 2px 8px rgba(250, 140, 22, 0.1);
+  background: #FFFBEB; /* Amber 50 */
+  color: #D97706; /* Amber 600 */
+  border-color: #FDE68A; /* Amber 200 */
 }
 
 .pending-list {
@@ -569,29 +711,28 @@ input:focus, select:focus {
   display: flex;
   align-items: flex-start;
   gap: 12px;
-  padding: 12px;
-  background: #fafafa;
-  border-radius: 12px;
-  transition: background 0.2s;
-  border: 1px solid transparent;
+  padding: 10px 12px;
+  background: #F8FAFC;
+  border-radius: 6px;
+  transition: background 0.15s;
+  border: 1px solid #E2E8F0;
 }
 
 .pending-item:hover {
   background: #fff;
-  border-color: #e6f7ff;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+  border-color: #CBD5E1;
 }
 
 .task-icon {
-  font-size: 18px;
+  font-size: 16px;
   background: #fff;
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+  border: 1px solid #E2E8F0;
 }
 
 .task-content {
@@ -610,6 +751,22 @@ input:focus, select:focus {
 .task-meta {
   font-size: 12px;
   color: #999;
+}
+
+.task-flags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.flag-tag {
+  font-size: 11px;
+  color: #D97706;
+  background: #FFFBEB;
+  border: 1px solid #FDE68A;
+  padding: 1px 6px;
+  border-radius: 4px;
 }
 
 .no-pending {

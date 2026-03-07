@@ -95,7 +95,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import axios from 'axios'
+import { apiGet, apiPost } from '../../api/realApi'
 
 const teachers = ref([])
 const searchKey = ref('')
@@ -114,9 +114,9 @@ const filteredTeachers = computed(() => {
 
 const fetchTeachers = async () => {
   try {
-    const res = await axios.get('/api/admin/teachers')
-    if (res.data.code === 200) {
-      teachers.value = res.data.data
+    const res = await apiGet('/api/admin/teachers')
+    if (res.code === 200) {
+      teachers.value = res.data
     }
   } catch (e) {
     console.error(e)
@@ -131,8 +131,8 @@ const editTeacher = (teacher) => {
 const resetPassword = async (teacher) => {
   if (!confirm(`确定要重置 ${teacher.name} 的密码吗？`)) return
   try {
-    const res = await axios.post('/api/admin/teacher/reset-password', { id: teacher.id })
-    alert(res.data.message)
+    const res = await apiPost('/api/admin/teacher/reset-password', { id: teacher.id })
+    alert(res.message || '密码已重置')
   } catch (e) {
     alert('操作失败')
   }
@@ -141,9 +141,9 @@ const resetPassword = async (teacher) => {
 const submitForm = async () => {
   try {
     if (showEditModal.value) {
-      await axios.post('/api/admin/teacher/update', form.value)
+      await apiPost('/api/admin/teacher/update', form.value)
     } else {
-      await axios.post('/api/admin/teacher/add', form.value)
+      await apiPost('/api/admin/teacher/add', form.value)
     }
     closeModal()
     fetchTeachers()

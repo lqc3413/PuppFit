@@ -55,7 +55,6 @@
 
 <script setup>
 import { ref, reactive } from 'vue'
-import axios from 'axios'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '../stores/user'
 
@@ -75,13 +74,20 @@ const handleLogin = async () => {
   errorMsg.value = ''
   
   try {
-    const res = await axios.post('/api/auth/login', {
-      username: form.username,
-      password: form.password,
-      type: activeTab.value
+    // 使用 fetch 直接请求后端
+    const response = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        username: form.username,
+        password: form.password,
+        type: activeTab.value
+      })
     })
     
-    const { code, data, message } = res.data
+    const res = await response.json()
+    const { code, data, message } = res
+    
     if (code === 200) {
       console.log('Login Success:', data)
       // 使用 Pinia Store 存储用户信息
@@ -89,7 +95,7 @@ const handleLogin = async () => {
       
       router.push('/dashboard')
     } else {
-      errorMsg.value = message
+      errorMsg.value = message || '登录失败'
     }
   } catch (err) {
     errorMsg.value = '登录请求失败，请检查网络'

@@ -77,7 +77,7 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import axios from 'axios'
+import { apiGet, apiPost } from '../../api/realApi'
 
 const exerciseTypes = ref([])
 const showAddModal = ref(false)
@@ -85,8 +85,8 @@ const showEditModal = ref(false)
 const form = ref({ name: '', unit: '', description: '' })
 
 const fetchData = async () => {
-  const res = await axios.get('/api/admin/exercise-types')
-  if (res.data.code === 200) exerciseTypes.value = res.data.data
+  const res = await apiGet('/api/admin/exercise-types')
+  if (res.code === 200) exerciseTypes.value = res.data.exercises || res.data
 }
 
 const getIcon = (name) => {
@@ -101,15 +101,26 @@ const editItem = (item) => {
 
 const toggleStatus = async (item) => {
   const newStatus = item.status === 'active' ? 'inactive' : 'active'
-  await axios.post('/api/admin/exercise-type/update', { id: item.id, status: newStatus })
+  await apiPost('/api/admin/exercise-type/update', { id: item.id, status: newStatus })
   fetchData()
 }
 
 const submitForm = async () => {
-  const url = showEditModal.value ? '/api/admin/exercise-type/update' : '/api/admin/exercise-type/add'
-  await axios.post(url, form.value)
-  closeModals()
-  fetchData()
+  try {
+    if (showEditModal.value) {
+      // 编辑：后端接收 JSON Body
+      await apiPost('/api/admin/exercise-type/update', form.value)
+    } else {
+      // 新增：后端已支持 JSON Body（2026-03-06 验证通过）
+      const body = { name: form.value.name, unit: form.value.unit }
+      if (form.value.description) body.description = form.value.description
+      await apiPost('/api/admin/exercise-type/add', body)
+    }
+    closeModals()
+    fetchData()
+  } catch (e) {
+    alert('操作失败：' + (e.message || '网络错误'))
+  }
 }
 
 const closeModals = () => {

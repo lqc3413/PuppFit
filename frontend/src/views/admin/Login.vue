@@ -20,7 +20,6 @@
 
 <script setup>
 import { ref } from 'vue'
-import axios from 'axios'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
@@ -33,18 +32,25 @@ const handleLogin = async () => {
   loading.value = true
   error.value = ''
   try {
-    const res = await axios.post('/api/auth/login', {
-      username: username.value,
-      password: password.value,
-      type: 'admin'
+    // 使用 fetch 直接请求后端
+    const response = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        username: username.value,
+        password: password.value,
+        type: 'admin'
+      })
     })
     
-    const { code, data, message } = res.data
+    const res = await response.json()
+    const { code, data, message } = res
+    
     if (code === 200) {
       localStorage.setItem('admin-token', data.token)
       router.push('/admin/dashboard')
     } else {
-      error.value = message
+      error.value = message || '登录失败'
     }
   } catch (err) {
     error.value = '连接服务器失败'

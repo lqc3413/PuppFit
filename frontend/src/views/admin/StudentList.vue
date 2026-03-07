@@ -25,7 +25,7 @@
         class="search-input"
       />
       <select v-model="filterClass" class="filter-select">
-        <option value="">全部班级</option>
+        <option :value="''">全部班级</option>
         <option v-for="cls in classes" :key="cls.id" :value="cls.id">{{ cls.name }}</option>
       </select>
       <select v-model="filterStatus" class="filter-select">
@@ -194,7 +194,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import axios from 'axios'
+import { apiGet, apiPost } from '../../api/realApi'
 
 const students = ref([])
 const classes = ref([])
@@ -216,7 +216,7 @@ const filteredStudents = computed(() => {
     const matchSearch = !searchKey.value || 
       s.name.includes(searchKey.value) || 
       s.studentId.includes(searchKey.value)
-    const matchClass = !filterClass.value || s.classId === filterClass.value
+    const matchClass = !filterClass.value || s.classId == filterClass.value
     const matchStatus = !filterStatus.value || s.status === filterStatus.value
     return matchSearch && matchClass && matchStatus
   })
@@ -225,11 +225,11 @@ const filteredStudents = computed(() => {
 const fetchData = async () => {
   try {
     const [studentsRes, classesRes] = await Promise.all([
-      axios.get('/api/admin/students'),
-      axios.get('/api/admin/classes')
+      apiGet('/api/admin/students'),
+      apiGet('/api/admin/classes')
     ])
-    if (studentsRes.data.code === 200) students.value = studentsRes.data.data
-    if (classesRes.data.code === 200) classes.value = classesRes.data.data
+    if (studentsRes.code === 200) students.value = studentsRes.data
+    if (classesRes.code === 200) classes.value = classesRes.data.classes || classesRes.data
   } catch (e) {
     console.error(e)
   }
@@ -237,11 +237,17 @@ const fetchData = async () => {
 
 const submitAdd = async () => {
   try {
-    await axios.post('/api/admin/student/add', addForm.value)
-    closeModals()
-    fetchData()
+    // 确保 classId 是数字类型
+    const payload = { ...addForm.value, classId: Number(addForm.value.classId) }
+    const res = await apiPost('/api/admin/student/add', payload)
+    if (res.code === 200) {
+      closeModals()
+      fetchData()
+    } else {
+      alert(res.message || '添加失败')
+    }
   } catch (e) {
-    alert('添加失败')
+    alert('添加失败：' + (e.message || '网络错误'))
   }
 }
 
@@ -260,8 +266,8 @@ const handleFileUpload = (e) => {
 
 const submitImport = async () => {
   try {
-    const res = await axios.post('/api/admin/student/import', { students: importPreview.value })
-    alert(res.data.message)
+    const res = await apiPost('/api/admin/student/import', { students: importPreview.value })
+    alert(res.message || '导入成功')
     closeModals()
     fetchData()
   } catch (e) {
@@ -277,9 +283,9 @@ const showTransfer = (student) => {
 
 const submitTransfer = async () => {
   try {
-    await axios.post('/api/admin/student/transfer', {
-      studentId: transferStudent.value.id,
-      newClassId: newClassId.value
+    await apiPost('/api/admin/student/transfer', {
+      studentId: Number(transferStudent.value.id),
+      newClassId: Number(newClassId.value)
     })
     closeModals()
     fetchData()
@@ -292,7 +298,7 @@ const toggleBan = async (student) => {
   const action = student.status === 'banned' ? '解封' : '封禁'
   if (!confirm(`确定要${action} ${student.name} 吗？`)) return
   try {
-    await axios.post('/api/admin/student/toggle-ban', { studentId: student.id })
+    await apiPost('/api/admin/student/toggle-ban', { studentId: student.id })
     fetchData()
   } catch (e) {
     alert('操作失败')
